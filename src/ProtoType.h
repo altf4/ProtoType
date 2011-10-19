@@ -1,8 +1,9 @@
 //============================================================================
-// Name        : ProtoType.cpp
+// Name        : ProtoType.h
 // Author      : AltF4
 // Copyright   : GNU GPL v3
-// Description : Hello World in C++, Ansi-style
+// Description : ProtoType, a traffic analysis attack to classify
+//					protocols through encryption
 //============================================================================
 
 #ifndef PROTOTYPE_H_

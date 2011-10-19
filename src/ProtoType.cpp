@@ -2,7 +2,8 @@
 // Name        : ProtoType.cpp
 // Author      : AltF4
 // Copyright   : GNU GPL v3
-// Description : ProtoType, a traffic analysis attack
+// Description : ProtoType, a traffic analysis attack to classify
+//					protocols through encryption
 //============================================================================
 
 #include <stdio.h>
@@ -86,7 +87,21 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	//Reported (not measured) size of IP layer
 	uint size_ip;
 
+	//TODO: Determine whether this packet is Tx or Rx
+	bool isRx = true;
+
 	//TODO: Calculate dependency variables for this new packet
+	if(isRx)
+	{
+		RxTotalBytes += header->len;
+		RxTotalPackets++;
+	}
+	else
+	{
+		TxTotalBytes += header->len;
+		TxTotalPackets++;
+	}
+
 
 }
 
