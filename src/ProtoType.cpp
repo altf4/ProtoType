@@ -12,19 +12,25 @@
 #include <iostream>
 #include "ProtoType.h"
 #include <pthread.h>
+#include <iostream>
+#include <fstream>
 
 using namespace std;
 
 uint classificationTimeout = 0;
+bool isTraining;
+char *dataFilePath;
 
 int main (int argc, char **argv)
 {
 	int c;
 	char *dev, errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *handle;
-	pthread_t classificationThread;
+	pthread_t classificationThread, trainingThread;
 
-	while ((c = getopt (argc, argv, ":i:t:")) != -1)
+	signal(SIGINT,WriteDataPointsToFile);
+
+	while ((c = getopt (argc, argv, ":i:tcm:d:")) != -1)
 	{
 		switch (c)
 		{
@@ -33,7 +39,7 @@ int main (int argc, char **argv)
 				dev = optarg;
 				break;
 			}
-			case 't':
+			case 'm':
 			{
 				int tempArg = atoi(optarg);
 				if(tempArg > 0)
@@ -46,6 +52,22 @@ int main (int argc, char **argv)
 							"Timeout must be an integer greater than Zero.\n";
 					cout << Usage();
 				}
+				break;
+			}
+			case 't':
+			{
+				isTraining = true;
+				break;
+			}
+			case 'c':
+			{
+				isTraining = false;
+				break;
+			}
+			case 'd':
+			{
+				dataFilePath = optarg;
+				LoadDataPointsFromFile(dataFilePath);
 				break;
 			}
 			case '?':
@@ -70,8 +92,18 @@ int main (int argc, char **argv)
 		}
 	}
 
-	//Start the Classification Loop
-	pthread_create( &classificationThread, NULL, ClassificationLoop, NULL);
+	if(isTraining)
+	{
+		//Start the Classification Loop
+		pthread_create( &trainingThread, NULL, TrainingLoop, NULL);
+	}
+	else
+	{
+		//Start the Classification Loop
+		pthread_create( &classificationThread, NULL, ClassificationLoop, NULL);
+	}
+
+
 
 	//Start listening for packets
 	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
@@ -117,6 +149,61 @@ void *ClassificationLoop(void *ptr)
 
 	//Shouldn't get here. This is just to get rid of the compiler warning.
 	return NULL;
+}
+
+void *TrainingLoop(void *ptr)
+{
+	//Keep looping
+	while(true)
+	{
+		sleep(classificationTimeout);
+
+		//TODO: Perform the classification
+	}
+
+	//Shouldn't get here. This is just to get rid of the compiler warning.
+	return NULL;
+}
+
+void LoadDataPointsFromFile(char* filePath)
+{
+	if(filePath == NULL)
+	{
+		cerr << "You entered an empty file path\n";
+		cout << Usage();
+		exit(1);
+	}
+	string line;
+
+	//Creates an instance of ofstream, and opens example.txt
+	ifstream dataFile(filePath);
+	getline(dataFile,line);
+
+
+
+
+	// Close the file stream explicitly
+	dataFile.close();
+
+
+}
+
+void WriteDataPointsToFile(int sig)
+{
+	if(dataFilePath == NULL)
+	{
+		cerr << "You entered an empty file path. :(\n";
+		cout << Usage();
+		exit(1);
+	}
+	string line;
+
+	//Creates an instance of ofstream, and opens example.txt
+	ofstream dataFile(dataFilePath);
+
+	//TODO: Do the actual writing here
+
+	dataFile.close();
 }
 
 string Usage()

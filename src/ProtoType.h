@@ -10,6 +10,7 @@
 #define PROTOTYPE_H_
 
 #include <vector>
+#include <signal.h>
 
 using namespace std;
 
@@ -46,6 +47,10 @@ vector <uint> TxInterarrivalTimes, RxInterarrivalTimes;
 void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
 void *ClassificationLoop(void* ptr);
+void *TrainingLoop(void* ptr);
+
+void LoadDataPointsFromFile(char* filePath);
+void WriteDataPointsToFile(int sig);
 
 string Usage();
 
