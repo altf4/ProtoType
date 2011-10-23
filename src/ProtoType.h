@@ -11,6 +11,10 @@
 
 #include <vector>
 #include <signal.h>
+#include <time.h>
+#include <string.h>
+#include <netinet/if_ether.h>
+
 
 using namespace std;
 
@@ -28,6 +32,25 @@ using namespace std;
 #define RX_PACKET_INTERARRIVAL_VARIANCE	7
 #define TX_RX_BYTE_RATIO				8
 
+//For every packet, we need to keep track of 3 things:
+//	-The ethernet header (IE the only thing in plaintext)
+//	-Timestamp when it was received
+//	-How big the whole packet was
+struct packet_t
+{
+	u_char eth_hdr[ETH_ALEN];
+	time_t timestamp;
+	uint len;
+};
+
+//Keep track of which end is the "Tx" and which is the "Rx"
+u_int8_t  etherTxAddress[ETH_ALEN];
+u_int8_t  etherRxAddress[ETH_ALEN];
+
+//An array of the last batch of packets
+//	(Gets cleared out after classification)
+vector <packet_t> packetlist;
+
 //The dependency variables
 //IE: Values used to calculate the above feature set
 
@@ -38,12 +61,10 @@ uint RxTotalPackets, TxTotalPackets;
 //Used to calculate PACKET_SIZE_VARIANCE
 vector <uint> TxPacketSizes, RxPacketSizes;
 
-//Used to calculate PACKET_INTERARRIVAL_MEAN
-uint RxTotalInterarrivalTime, TxTotalInterarrivalTime;
-//Also uses RxTotalPackets, TxTotalPackets from above
-
 //Used to calculate PACKET_INTERARRIVAL_VARIANCE
-vector <uint> TxInterarrivalTimes, RxInterarrivalTimes;
+vector <time_t> TxInterarrivalTimes, RxInterarrivalTimes;
+time_t RxLastPacketArrivalTime=0, TxLastPacketArrivalTime=0;
+
 
 //Function declarations
 void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
@@ -54,9 +75,11 @@ void *TrainingLoop(void* ptr);
 void LoadDataPointsFromFile(char* filePath);
 void WriteDataPointsToFile(int sig);
 
-void CalculateDependencyVariables();
+void CalculateDependencyVariables(packet_t packet);
 void CalculateFeatureSet();
 void Classify();
+
+bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2);
 
 string Usage();
 

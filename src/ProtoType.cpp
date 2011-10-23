@@ -30,7 +30,7 @@ int main (int argc, char **argv)
 
 	signal(SIGINT,WriteDataPointsToFile);
 
-	while ((c = getopt (argc, argv, ":i:tcm:")) != -1)
+	while ((c = getopt (argc, argv, ":i:tcm:d:s:")) != -1)
 	{
 		switch (c)
 		{
@@ -67,6 +67,18 @@ int main (int argc, char **argv)
 				LoadDataPointsFromFile(dataFilePath);
 				break;
 			}
+			case 's':
+			{
+				//TODO: Accept and validate hw address input
+				//	to etherRxAddress
+				break;
+			}
+			case 'd':
+			{
+				//TODO: Accept and validate hw address input
+				//	to etherTxAddress
+				break;
+			}
 			case '?':
 			{
 				if (isprint (optopt))
@@ -88,6 +100,10 @@ int main (int argc, char **argv)
 			}
 		}
 	}
+
+	//Initialize the ethernet addresses to empty
+	bzero(etherTxAddress, sizeof(etherTxAddress));
+	bzero(etherRxAddress, sizeof(etherRxAddress));
 
 	if(isTraining)
 	{
@@ -111,27 +127,13 @@ int main (int argc, char **argv)
 
 void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 {
-	//Pointers into the packet object for different TCP/IP layers
-	char* ethernet, ip;
-	//Reported (not measured) size of IP layer
-	uint size_ip;
+	packet_t thisPacket;
 
-	//TODO: Determine whether this packet is Tx or Rx
-	bool isRx = true;
+	thisPacket.timestamp = header->ts.tv_sec;
+	thisPacket.len = header->len;
+	memcpy( thisPacket.eth_hdr, packet, ETH_ALEN);
 
-	//TODO: Calculate dependency variables for this new packet
-	if(isRx)
-	{
-		RxTotalBytes += header->len;
-		RxTotalPackets++;
-	}
-	else
-	{
-		TxTotalBytes += header->len;
-		TxTotalPackets++;
-	}
-
-
+	packetlist.push_back(thisPacket);
 }
 
 void *ClassificationLoop(void *ptr)
@@ -140,10 +142,17 @@ void *ClassificationLoop(void *ptr)
 	while(true)
 	{
 		sleep(classificationTimeout);
-		CalculateDependencyVariables();
+
+		for(uint i = 0; i < packetlist.size(); i++)
+		{
+			CalculateDependencyVariables(packetlist[i]);
+		}
+		packetlist.clear();
+
+		//TODO: Perform the classification
 		CalculateFeatureSet();
 		Classify();
-		//TODO: Perform the classification
+
 	}
 
 	//Shouldn't get here. This is just to get rid of the compiler warning.
@@ -204,9 +213,63 @@ void WriteDataPointsToFile(int sig)
 
 	dataFile.close();
 }
-
-void CalculateDependencyVariables()
+//Calculate the set of dependency variables for this new packet
+void CalculateDependencyVariables(packet_t packet)
 {
+	bool isRx;
+
+	//Pointers into the packet object for different TCP/IP layers
+	struct ether_header *ethernet;
+
+	ethernet = (struct ether_header *) packet.eth_hdr;
+
+	if( CompareEthAddresses( ethernet->ether_shost, etherTxAddress) )
+	{
+		isRx = false;
+	}
+	else if( CompareEthAddresses( ethernet->ether_shost, etherRxAddress) )
+	{
+		isRx = true;
+	}
+
+
+	//Calculate Dependency Variables
+	if(isRx)
+	{
+		RxTotalBytes += packet.len;
+		RxTotalPackets++;
+
+		//If this is not our first packet...
+		if(RxLastPacketArrivalTime != 0)
+		{
+			RxInterarrivalTimes.push_back( packet.timestamp - RxLastPacketArrivalTime );
+		}
+		//Our first packet
+		else
+		{
+			RxLastPacketArrivalTime = packet.timestamp;
+		}
+		RxPacketSizes.push_back(packet.len);
+		RxLastPacketArrivalTime = packet.timestamp;
+	}
+	else
+	{
+		TxTotalBytes += packet.len;
+		TxTotalPackets++;
+
+		//If this is not our first packet...
+		if(TxLastPacketArrivalTime != 0)
+		{
+			TxInterarrivalTimes.push_back( packet.timestamp - TxLastPacketArrivalTime );
+		}
+		//Our first packet
+		else
+		{
+			TxLastPacketArrivalTime = packet.timestamp;
+		}
+		TxPacketSizes.push_back(packet.len);
+		TxLastPacketArrivalTime = packet.timestamp;
+	}
 
 }
 
@@ -220,12 +283,27 @@ void Classify()
 
 }
 
+bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2)
+{
+	for(uint i = 0; i < ETH_ALEN; i++)
+	{
+		if(addr1[i] != addr2[i])
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 string Usage()
 {
-	string outputString = "Usage: ProtoType -i Dev -t ClassTimeout\n";
+	string outputString = "Usage: ProtoType -i Dev -t ClassTimeout -s SourceMAC -d DestMAC\n";
 	outputString += "Listen on the ethernet device, Dev\n";
 	outputString += "Wait for ClassTimeout ms between classifications\n";
-	outputString += "IE: ProtoType -i eth0 t 5000\n";
+	outputString += "Wait for ClassTimeout ms between classifications\n";
+	outputString += "Wait for ClassTimeout ms between classifications\n";
+
+	outputString += "IE: ProtoType -i eth0 -t 5000 \n";
 
 	return outputString;
 }
