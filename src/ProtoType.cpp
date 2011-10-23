@@ -30,7 +30,7 @@ int main (int argc, char **argv)
 
 	signal(SIGINT,WriteDataPointsToFile);
 
-	while ((c = getopt (argc, argv, ":i:tcm:d:")) != -1)
+	while ((c = getopt (argc, argv, ":i:tcm:")) != -1)
 	{
 		switch (c)
 		{
@@ -57,15 +57,12 @@ int main (int argc, char **argv)
 			case 't':
 			{
 				isTraining = true;
+				dataFilePath = optarg;
 				break;
 			}
 			case 'c':
 			{
 				isTraining = false;
-				break;
-			}
-			case 'd':
-			{
 				dataFilePath = optarg;
 				LoadDataPointsFromFile(dataFilePath);
 				break;
@@ -143,7 +140,9 @@ void *ClassificationLoop(void *ptr)
 	while(true)
 	{
 		sleep(classificationTimeout);
-
+		CalculateDependencyVariables();
+		CalculateFeatureSet();
+		Classify();
 		//TODO: Perform the classification
 	}
 
@@ -204,6 +203,21 @@ void WriteDataPointsToFile(int sig)
 	//TODO: Do the actual writing here
 
 	dataFile.close();
+}
+
+void CalculateDependencyVariables()
+{
+
+}
+
+void CalculateFeatureSet()
+{
+
+}
+
+void Classify()
+{
+
 }
 
 string Usage()

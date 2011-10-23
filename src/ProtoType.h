@@ -26,6 +26,7 @@ using namespace std;
 #define RX_PACKET_INTERARRIVAL_MEAN		5
 #define TX_PACKET_INTERARRIVAL_VARIANCE	6
 #define RX_PACKET_INTERARRIVAL_VARIANCE	7
+#define TX_RX_BYTE_RATIO				8
 
 //The dependency variables
 //IE: Values used to calculate the above feature set
@@ -44,6 +45,7 @@ uint RxTotalInterarrivalTime, TxTotalInterarrivalTime;
 //Used to calculate PACKET_INTERARRIVAL_VARIANCE
 vector <uint> TxInterarrivalTimes, RxInterarrivalTimes;
 
+//Function declarations
 void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
 void *ClassificationLoop(void* ptr);
@@ -51,6 +53,10 @@ void *TrainingLoop(void* ptr);
 
 void LoadDataPointsFromFile(char* filePath);
 void WriteDataPointsToFile(int sig);
+
+void CalculateDependencyVariables();
+void CalculateFeatureSet();
+void Classify();
 
 string Usage();
 
