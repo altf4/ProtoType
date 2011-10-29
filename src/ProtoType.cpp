@@ -125,6 +125,7 @@ int main (int argc, char **argv)
 	return 0;
 }
 
+//Gets called each time a packet arrives.
 void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
 {
 	packet_t thisPacket;
@@ -136,6 +137,8 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	packetlist.push_back(thisPacket);
 }
 
+//Periodically wakes up and reclassifies the data.
+//	We wouldn't want to do this for every new packet, that'd be crazy
 void *ClassificationLoop(void *ptr)
 {
 	//Keep looping
@@ -159,6 +162,7 @@ void *ClassificationLoop(void *ptr)
 	return NULL;
 }
 
+//On training mode, reclassify data points periodically
 void *TrainingLoop(void *ptr)
 {
 	//Keep looping
@@ -173,6 +177,7 @@ void *TrainingLoop(void *ptr)
 	return NULL;
 }
 
+//Called in classification mode to retrieve a stored data set
 void LoadDataPointsFromFile(char* filePath)
 {
 	if(filePath == NULL)
@@ -196,6 +201,7 @@ void LoadDataPointsFromFile(char* filePath)
 
 }
 
+//Called on training mode to save data to file
 void WriteDataPointsToFile(int sig)
 {
 	if(dataFilePath == NULL)
@@ -273,16 +279,19 @@ void CalculateDependencyVariables(packet_t packet)
 
 }
 
+//Update the feature set for new evidence that's come in
 void CalculateFeatureSet()
 {
 
 }
 
+//The actual classification. Where all the magic happens
 void Classify()
 {
 
 }
 
+//Campares two MAC addresses. Returns true if they're identical
 bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2)
 {
 	for(uint i = 0; i < ETH_ALEN; i++)
@@ -295,13 +304,15 @@ bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2)
 	return true;
 }
 
+
+//Prints usage tips when you screw up the command line arguments
 string Usage()
 {
 	string outputString = "Usage: ProtoType -i Dev -t ClassTimeout -s SourceMAC -d DestMAC\n";
 	outputString += "Listen on the ethernet device, Dev\n";
 	outputString += "Wait for ClassTimeout ms between classifications\n";
-	outputString += "Wait for ClassTimeout ms between classifications\n";
-	outputString += "Wait for ClassTimeout ms between classifications\n";
+	outputString += "Use HW Address SourceMAC as source\n";
+	outputString += "Use HW Address DestMAC as destination\n";
 
 	outputString += "IE: ProtoType -i eth0 -t 5000 \n";
 
