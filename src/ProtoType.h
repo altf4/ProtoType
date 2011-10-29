@@ -32,6 +32,12 @@ using namespace std;
 #define RX_PACKET_INTERARRIVAL_VARIANCE	7
 #define TX_RX_BYTE_RATIO				8
 
+//Number of dimensions
+#define DIM	9
+
+//The feature set
+double featureSet[DIM];
+
 //For every packet, we need to keep track of 3 things:
 //	-The ethernet header (IE the only thing in plaintext)
 //	-Timestamp when it was received

@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <iostream>
 #include <fstream>
+#include <math.h>
 
 using namespace std;
 
@@ -146,6 +147,8 @@ void *ClassificationLoop(void *ptr)
 	{
 		sleep(classificationTimeout);
 
+		//For the new packet's we've accumulated, recalculate
+		//	Dependency variables
 		for(uint i = 0; i < packetlist.size(); i++)
 		{
 			CalculateDependencyVariables(packetlist[i]);
@@ -282,7 +285,54 @@ void CalculateDependencyVariables(packet_t packet)
 //Update the feature set for new evidence that's come in
 void CalculateFeatureSet()
 {
+	//packet size mean
+	featureSet[TX_PACKET_SIZE_MEAN] = TxTotalBytes / TxTotalPackets;
+	featureSet[RX_PACKET_SIZE_MEAN] = RxTotalBytes / RxTotalPackets;
 
+	//Tx Packet size variance
+	double tempSum = 0;
+	for(uint i = 0; i < TxPacketSizes.size(); i++)
+	{
+		tempSum += pow( (TxPacketSizes[i] - featureSet[TX_PACKET_SIZE_MEAN]), 2);
+	}
+	featureSet[TX_PACKET_SIZE_VARIANCE] = tempSum / TxPacketSizes.size();
+
+	//Rx Packet size variance
+	tempSum = 0;
+	for(uint i = 0; i < RxPacketSizes.size(); i++)
+	{
+		tempSum += pow( (RxPacketSizes[i] - featureSet[RX_PACKET_SIZE_MEAN]), 2);
+	}
+	featureSet[RX_PACKET_SIZE_VARIANCE] = tempSum / RxPacketSizes.size();
+
+	//TX_PACKET_INTERARRIVAL_MEAN
+	featureSet[TX_PACKET_INTERARRIVAL_MEAN] =
+		( TxInterarrivalTimes.back() - TxInterarrivalTimes.front() ) / TxTotalPackets;
+
+	//RX_PACKET_INTERARRIVAL_MEAN
+	featureSet[RX_PACKET_INTERARRIVAL_MEAN] =
+		( RxInterarrivalTimes.back() - RxInterarrivalTimes.front() ) / RxTotalPackets;
+
+	//TX_PACKET_INTERARRIVAL_VARIANCE
+	tempSum = 0;
+	for(uint i = 0; i < TxInterarrivalTimes.size(); i++)
+	{
+		tempSum += pow( (TxInterarrivalTimes[i] -
+			featureSet[TX_PACKET_INTERARRIVAL_VARIANCE]), 2);
+	}
+	featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / TxInterarrivalTimes.size();
+
+	//RX_PACKET_INTERARRIVAL_VARIANCE
+	tempSum = 0;
+	for(uint i = 0; i < RxInterarrivalTimes.size(); i++)
+	{
+		tempSum += pow( (RxInterarrivalTimes[i] -
+			featureSet[RX_PACKET_INTERARRIVAL_VARIANCE]), 2);
+	}
+	featureSet[RX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / RxInterarrivalTimes.size();
+
+	//TX_RX_BYTE_RATIO
+	featureSet[TX_RX_BYTE_RATIO] = TxTotalBytes / RxTotalBytes;
 }
 
 //The actual classification. Where all the magic happens
