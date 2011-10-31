@@ -37,6 +37,7 @@
 								<option id="gnu.cpp.link.option.libs.977377054" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="pcap"/>
 									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="ann"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.644813953" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>

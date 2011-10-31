@@ -57,6 +57,7 @@ u_int8_t  etherRxAddress[ETH_ALEN];
 //	(Gets cleared out after classification)
 vector <packet_t> packetlist;
 
+//###################################################################
 //The dependency variables
 //IE: Values used to calculate the above feature set
 
@@ -70,6 +71,12 @@ vector <uint> TxPacketSizes, RxPacketSizes;
 //Used to calculate PACKET_INTERARRIVAL_VARIANCE
 vector <time_t> TxInterarrivalTimes, RxInterarrivalTimes;
 time_t RxLastPacketArrivalTime=0, TxLastPacketArrivalTime=0;
+//###################################################################
+
+//Classification constants
+const uint k = 1;
+const double eps = 0;
+const int maxPts = 1000;
 
 
 //Function declarations
@@ -78,7 +85,7 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 void *ClassificationLoop(void* ptr);
 void *TrainingLoop(void* ptr);
 
-void LoadDataPointsFromFile(char* filePath);
+void LoadDataPointsFromFile(string filePath);
 void WriteDataPointsToFile(int sig);
 
 void CalculateDependencyVariables(packet_t packet);

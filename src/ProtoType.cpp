@@ -15,29 +15,32 @@
 #include <iostream>
 #include <fstream>
 #include <math.h>
+#include <ANN/ANN.h>
+
 
 using namespace std;
 
-uint classificationTimeout = 0;
-bool isTraining;
-char *dataFilePath;
+uint classificationTimeout = 200;
+bool isTraining = true;
+string dataFilePath;
 
 int main (int argc, char **argv)
 {
 	int c;
-	char *dev, errbuf[PCAP_ERRBUF_SIZE];
+	char errbuf[PCAP_ERRBUF_SIZE];
+	string dev;
 	pcap_t *handle;
 	pthread_t classificationThread, trainingThread;
 
 	signal(SIGINT,WriteDataPointsToFile);
 
-	while ((c = getopt (argc, argv, ":i:tcm:d:s:")) != -1)
+	while ((c = getopt (argc, argv, ":i:t:c:m:d:s:")) != -1)
 	{
 		switch (c)
 		{
 			case 'i':
 			{
-				dev = optarg;
+				dev.assign(optarg);
 				break;
 			}
 			case 'm':
@@ -58,13 +61,19 @@ int main (int argc, char **argv)
 			case 't':
 			{
 				isTraining = true;
-				dataFilePath = optarg;
+				if(optarg == NULL)
+				{
+					cout << "Path to data file is Null.\n";
+					cout << Usage();
+					exit(-1);
+				}
+				dataFilePath.assign(optarg);
 				break;
 			}
 			case 'c':
 			{
 				isTraining = false;
-				dataFilePath = optarg;
+				dataFilePath.assign(optarg);
 				LoadDataPointsFromFile(dataFilePath);
 				break;
 			}
@@ -120,7 +129,7 @@ int main (int argc, char **argv)
 
 
 	//Start listening for packets
-	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+	handle = pcap_open_live(dev.c_str(), BUFSIZ, 1, 1000, errbuf);
 	pcap_loop(handle, 0, PacketHandler, NULL);
 
 	return 0;
@@ -181,9 +190,9 @@ void *TrainingLoop(void *ptr)
 }
 
 //Called in classification mode to retrieve a stored data set
-void LoadDataPointsFromFile(char* filePath)
+void LoadDataPointsFromFile(string filePath)
 {
-	if(filePath == NULL)
+	if(filePath.empty())
 	{
 		cerr << "You entered an empty file path\n";
 		cout << Usage();
@@ -192,7 +201,7 @@ void LoadDataPointsFromFile(char* filePath)
 	string line;
 
 	//Creates an instance of ofstream, and opens example.txt
-	ifstream dataFile(filePath);
+	ifstream dataFile(filePath.c_str());
 	getline(dataFile,line);
 
 
@@ -207,7 +216,7 @@ void LoadDataPointsFromFile(char* filePath)
 //Called on training mode to save data to file
 void WriteDataPointsToFile(int sig)
 {
-	if(dataFilePath == NULL)
+	if(dataFilePath.empty())
 	{
 		cerr << "You entered an empty file path. :(\n";
 		cout << Usage();
@@ -216,11 +225,16 @@ void WriteDataPointsToFile(int sig)
 	string line;
 
 	//Creates an instance of ofstream, and opens example.txt
-	ofstream dataFile(dataFilePath);
+	ofstream dataStream;
+	dataStream.open(dataFilePath.c_str(), fstream::out | fstream::app);
 
 	//TODO: Do the actual writing here
+	dataStream << "worked\n";
 
-	dataFile.close();
+	dataStream.close();
+
+	cout << "Data written to file. Thank you, please come again!\n";
+	exit(1);
 }
 //Calculate the set of dependency variables for this new packet
 void CalculateDependencyVariables(packet_t packet)
@@ -338,6 +352,42 @@ void CalculateFeatureSet()
 //The actual classification. Where all the magic happens
 void Classify()
 {
+	int nPts = 0;
+	ANNpointArray dataPts;
+	ANNpoint queryPt;
+
+	ANNidxArray	nnIdx;
+	ANNdistArray dists;
+	ANNkd_tree *kdTree;
+
+	queryPt = annAllocPt(DIM);
+	dataPts = annAllocPts(maxPts, DIM);
+	nnIdx = new ANNidx[k];
+	dists = new ANNdist[k];
+
+	kdTree = new ANNkd_tree(
+			dataPts,
+			nPts,
+			DIM);
+
+	kdTree->annkSearch(
+			queryPt,
+			k,
+			nnIdx,
+			dists,
+			eps);
+
+	cout << "NN: Index Distance\n";
+
+	for (uint i = 0; i < k; i++)
+	{
+		dists[i] = sqrt(dists[i]);
+		cout << i << " " << nnIdx[i] << " " << dists[i] << "\n";
+		delete [] nnIdx;
+		delete [] dists;
+		delete kdTree;
+		annClose();
+	}
 
 }
 
