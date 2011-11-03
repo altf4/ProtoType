@@ -38,6 +38,9 @@ using namespace std;
 //The feature set
 double featureSet[DIM];
 
+//Used to calculate normalization
+double maxFeatureValues[DIM];
+
 //For every packet, we need to keep track of 3 things:
 //	-The ethernet header (IE the only thing in plaintext)
 //	-Timestamp when it was received
@@ -73,10 +76,11 @@ vector <time_t> TxInterarrivalTimes, RxInterarrivalTimes;
 time_t RxLastPacketArrivalTime=0, TxLastPacketArrivalTime=0;
 //###################################################################
 
-//Classification constants
+//Classification variables
 const uint k = 1;
 const double eps = 0;
-const int maxPts = 1000;
+int maxPts = 1000;
+int nPts = 0;
 
 
 //Function declarations

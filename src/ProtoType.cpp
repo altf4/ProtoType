@@ -11,18 +11,28 @@
 #include <pcap.h>
 #include <iostream>
 #include "ProtoType.h"
+#include "Point.h"
 #include <pthread.h>
 #include <iostream>
 #include <fstream>
 #include <math.h>
 #include <ANN/ANN.h>
 
-
 using namespace std;
 
 uint classificationTimeout = 200;
 bool isTraining = true;
 string dataFilePath;
+
+//The list of data points, with classification
+vector <Point*> dataPointsWithClass;
+ANNpointArray dataPts;
+ANNpointArray normalizedDataPts;
+
+//The feature set in ANN point format
+ANNpoint queryPt = annAllocPt(DIM);
+double classification;
+
 
 int main (int argc, char **argv)
 {
@@ -190,51 +200,93 @@ void *TrainingLoop(void *ptr)
 }
 
 //Called in classification mode to retrieve a stored data set
+//	Writes into dataPointsWithClass, normalizedDataPts, and dataPts
 void LoadDataPointsFromFile(string filePath)
 {
-	if(filePath.empty())
-	{
-		cerr << "You entered an empty file path\n";
-		cout << Usage();
-		exit(1);
-	}
-	string line;
+	ifstream myfile (dataFilePath.data());
+		string line;
+		int i = 0;
+		//Count the number of data points for allocation
+		if (myfile.is_open())
+		{
+			while (!myfile.eof())
+			{
+				if(myfile.peek() == EOF)
+				{
+					break;
+				}
+				getline(myfile,line);
+				i++;
+			}
+		}
+		else
+		{
+			cerr << "Unable to open file.\n";
+		}
+		myfile.close();
+		maxPts = i;
 
-	//Creates an instance of ofstream, and opens example.txt
-	ifstream dataFile(filePath.c_str());
-	getline(dataFile,line);
+		//Open the file again, allocate the number of points and assign
+		myfile.open(dataFilePath.data(), ifstream::in);
+		dataPts = annAllocPts(maxPts, DIM);
+		normalizedDataPts = annAllocPts(maxPts, DIM);
 
+		if (myfile.is_open())
+		{
+			i = 0;
 
+			while (!myfile.eof() && (i < maxPts))
+			{
+				if(myfile.peek() == EOF)
+				{
+					break;
+				}
 
+				dataPointsWithClass.push_back(new Point());
 
-	// Close the file stream explicitly
-	dataFile.close();
+				for(int j = 0;j < DIM;j++)
+				{
+					getline(myfile,line,' ');
+					double temp = strtod(line.data(), NULL);
 
+					dataPointsWithClass[i]->annPoint[j] = temp;
+					dataPts[i][j] = temp;
 
+					//Set the max values of each feature. (Used later in normalization)
+					if(temp > maxFeatureValues[j])
+					{
+						maxFeatureValues[j] = temp;
+					}
+				}
+				getline(myfile,line);
+				dataPointsWithClass[i]->classification = atoi(line.data());
+				i++;
+			}
+			nPts = i;
+		}
+		else cerr << "Unable to open file.\n";
+		myfile.close();
 }
 
 //Called on training mode to save data to file
 void WriteDataPointsToFile(int sig)
 {
-	if(dataFilePath.empty())
+	ofstream myfile (dataFilePath.data(), ios::app);
+
+	if (myfile.is_open())
 	{
-		cerr << "You entered an empty file path. :(\n";
-		cout << Usage();
-		exit(1);
+		for(int i=0; i < DIM; i++)
+		{
+			myfile << featureSet[i] << " ";
+		}
+		myfile << classification;
+		myfile << "\n";
 	}
-	string line;
-
-	//Creates an instance of ofstream, and opens example.txt
-	ofstream dataStream;
-	dataStream.open(dataFilePath.c_str(), fstream::out | fstream::app);
-
-	//TODO: Do the actual writing here
-	dataStream << "worked\n";
-
-	dataStream.close();
-
-	cout << "Data written to file. Thank you, please come again!\n";
-	exit(1);
+	else
+	{
+		cerr << "Unable to open file.\n";
+	}
+	myfile.close();
 }
 //Calculate the set of dependency variables for this new packet
 void CalculateDependencyVariables(packet_t packet)
@@ -352,8 +404,6 @@ void CalculateFeatureSet()
 //The actual classification. Where all the magic happens
 void Classify()
 {
-	int nPts = 0;
-	ANNpointArray dataPts;
 	ANNpoint queryPt;
 
 	ANNidxArray	nnIdx;

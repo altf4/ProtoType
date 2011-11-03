@@ -5,16 +5,19 @@
 // Description : Point class that encapsulates an ANN point and classification
 //============================================================================
 
-#include "Point.h"
+#define DIM 9
 
+#include "Point.h"
 
 
 Point::Point()
 {
-
+	annPoint = annAllocPt(DIM);
+	classification = 0;
 }
 
 Point::~Point()
 {
+	annDeallocPt(annPoint);
 
 }
