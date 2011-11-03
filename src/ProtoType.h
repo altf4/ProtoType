@@ -94,7 +94,9 @@ void WriteDataPointsToFile(int sig);
 
 void CalculateDependencyVariables(packet_t packet);
 void CalculateFeatureSet();
+void NormalizeDataPoints();
 void Classify();
+
 
 bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2);
 

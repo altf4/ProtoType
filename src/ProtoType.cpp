@@ -174,14 +174,61 @@ void *ClassificationLoop(void *ptr)
 		}
 		packetlist.clear();
 
-		//TODO: Perform the classification
 		CalculateFeatureSet();
+		NormalizeDataPoints();
 		Classify();
 
 	}
 
 	//Shouldn't get here. This is just to get rid of the compiler warning.
 	return NULL;
+}
+
+void NormalizeDataPoints()
+{
+	//Find the max values for each feature
+	for(int i = 0; i < DIM; i++)
+	{
+		if(featureSet[i] > maxFeatureValues[i])
+		{
+			maxFeatureValues[i] = featureSet[i];
+		}
+	}
+
+	//Normalize the suspect points
+
+	//If the max is 0, then there's no need to normalize! (Plus it'd be a div by zero)
+	for(int i = 0;i < DIM; i++)
+	{
+		if(maxFeatureValues[0] != 0)
+		{
+			queryPt[i] = (double)(featureSet[i] / maxFeatureValues[i]);
+		}
+		else
+		{
+			cerr << "Max Feature Value for feature " << (i+1) << " is 0!\n";
+		}
+	}
+
+
+	//Normalize the data points
+	//Foreach data point
+	for(int j = 0; j < DIM; j++)
+	{
+		//Foreach feature within the data point
+		for(int i=0;i < nPts;i++)
+		{
+			if(maxFeatureValues[j] != 0)
+			{
+				normalizedDataPts[i][j] = (double)((dataPts[i][j] / maxFeatureValues[j]));
+			}
+			else
+			{
+				cerr << "Max Feature Value for feature " << (i+1) << " is 0!\n";
+				break;
+			}
+		}
+	}
 }
 
 //On training mode, reclassify data points periodically
@@ -287,6 +334,7 @@ void WriteDataPointsToFile(int sig)
 		cerr << "Unable to open file.\n";
 	}
 	myfile.close();
+	exit(1);
 }
 //Calculate the set of dependency variables for this new packet
 void CalculateDependencyVariables(packet_t packet)
