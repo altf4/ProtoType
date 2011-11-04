@@ -158,7 +158,7 @@ int main (int argc, char **argv)
 
 	//Start listening for packets
 	handle = pcap_open_live(dev.c_str(), BUFSIZ, 1, 1000, errbuf);
-	pcap_loop(handle, 0, PacketHandler, NULL);
+	pcap_loop(handle, -1, PacketHandler, NULL);
 
 	return 0;
 }
@@ -171,7 +171,6 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	thisPacket.timestamp = header->ts.tv_sec;
 	thisPacket.len = header->len;
 
-	//Do I need to switch the byte order?
 	memcpy( &thisPacket.eth_dest_addr, packet, ETH_ALEN);
 	memcpy( &thisPacket.eth_src_addr, packet + ETH_ALEN, ETH_ALEN);
 
@@ -229,10 +228,6 @@ void NormalizeDataPoints()
 		if(maxFeatureValues[0] != 0)
 		{
 			queryPt[i] = (double)(featureSet[i] / maxFeatureValues[i]);
-		}
-		else
-		{
-			cerr << "Max Feature Value for feature " << (i+1) << " is 0!\n";
 		}
 	}
 
@@ -431,54 +426,120 @@ void CalculateDependencyVariables(packet_t packet)
 //Update the feature set for new evidence that's come in
 void CalculateFeatureSet()
 {
-	//packet size mean
-	featureSet[TX_PACKET_SIZE_MEAN] = TxTotalBytes / TxTotalPackets;
-	featureSet[RX_PACKET_SIZE_MEAN] = RxTotalBytes / RxTotalPackets;
+	//Packet size mean
+	if( TxTotalPackets != 0 )
+	{
+		featureSet[TX_PACKET_SIZE_MEAN] = TxTotalBytes / TxTotalPackets;
+	}
+	else
+	{
+		featureSet[TX_PACKET_SIZE_MEAN] = 0;
+	}
+	if( RxTotalPackets != 0 )
+	{
+		featureSet[RX_PACKET_SIZE_MEAN] = RxTotalBytes / RxTotalPackets;
+	}
+	else
+	{
+		featureSet[RX_PACKET_SIZE_MEAN] = 0;
+	}
+
 
 	//Tx Packet size variance
 	double tempSum = 0;
-	for(uint i = 0; i < TxPacketSizes.size(); i++)
+	if (TxPacketSizes.size() > 0)
 	{
-		tempSum += pow( (TxPacketSizes[i] - featureSet[TX_PACKET_SIZE_MEAN]), 2);
+		for(uint i = 0; i < TxPacketSizes.size(); i++)
+		{
+			tempSum += pow( (TxPacketSizes[i] - featureSet[TX_PACKET_SIZE_MEAN]), 2);
+		}
+		featureSet[TX_PACKET_SIZE_VARIANCE] = tempSum / TxPacketSizes.size();
 	}
-	featureSet[TX_PACKET_SIZE_VARIANCE] = tempSum / TxPacketSizes.size();
+	else
+	{
+		featureSet[TX_PACKET_SIZE_VARIANCE] = 0;
+	}
+
 
 	//Rx Packet size variance
 	tempSum = 0;
-	for(uint i = 0; i < RxPacketSizes.size(); i++)
+	if (RxPacketSizes.size() > 0)
 	{
-		tempSum += pow( (RxPacketSizes[i] - featureSet[RX_PACKET_SIZE_MEAN]), 2);
+		for(uint i = 0; i < RxPacketSizes.size(); i++)
+		{
+			tempSum += pow( (RxPacketSizes[i] - featureSet[RX_PACKET_SIZE_MEAN]), 2);
+		}
+		featureSet[RX_PACKET_SIZE_VARIANCE] = tempSum / RxPacketSizes.size();
 	}
-	featureSet[RX_PACKET_SIZE_VARIANCE] = tempSum / RxPacketSizes.size();
+	else
+	{
+		featureSet[RX_PACKET_SIZE_VARIANCE] = 0;
+	}
 
 	//TX_PACKET_INTERARRIVAL_MEAN
-	featureSet[TX_PACKET_INTERARRIVAL_MEAN] =
-		( TxInterarrivalTimes.back() - TxInterarrivalTimes.front() ) / TxTotalPackets;
+	if( TxTotalPackets > 1 )
+	{
+		featureSet[TX_PACKET_INTERARRIVAL_MEAN] =
+			( TxInterarrivalTimes.back() - TxInterarrivalTimes.front() ) / TxTotalPackets;
+	}
+	else
+	{
+		featureSet[TX_PACKET_INTERARRIVAL_MEAN] = 0;
+	}
 
 	//RX_PACKET_INTERARRIVAL_MEAN
-	featureSet[RX_PACKET_INTERARRIVAL_MEAN] =
-		( RxInterarrivalTimes.back() - RxInterarrivalTimes.front() ) / RxTotalPackets;
+	if( RxTotalPackets > 1 )
+	{
+		featureSet[RX_PACKET_INTERARRIVAL_MEAN] =
+			( RxInterarrivalTimes.back() - RxInterarrivalTimes.front() ) / RxTotalPackets;
+	}
+	else
+	{
+		featureSet[RX_PACKET_INTERARRIVAL_MEAN] = 0;
+	}
 
 	//TX_PACKET_INTERARRIVAL_VARIANCE
 	tempSum = 0;
-	for(uint i = 0; i < TxInterarrivalTimes.size(); i++)
+	if( TxInterarrivalTimes.size() > 0 )
 	{
-		tempSum += pow( (TxInterarrivalTimes[i] -
-			featureSet[TX_PACKET_INTERARRIVAL_VARIANCE]), 2);
+		for(uint i = 0; i < TxInterarrivalTimes.size(); i++)
+		{
+			tempSum += pow( (TxInterarrivalTimes[i] -
+				featureSet[TX_PACKET_INTERARRIVAL_MEAN]), 2);
+		}
+		featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / TxInterarrivalTimes.size();
 	}
-	featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / TxInterarrivalTimes.size();
+	else
+	{
+		featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = 0;
+	}
+
 
 	//RX_PACKET_INTERARRIVAL_VARIANCE
 	tempSum = 0;
-	for(uint i = 0; i < RxInterarrivalTimes.size(); i++)
+	if( RxInterarrivalTimes.size() > 0 )
 	{
-		tempSum += pow( (RxInterarrivalTimes[i] -
-			featureSet[RX_PACKET_INTERARRIVAL_VARIANCE]), 2);
+		for(uint i = 0; i < RxInterarrivalTimes.size(); i++)
+		{
+			tempSum += pow( (RxInterarrivalTimes[i] -
+				featureSet[RX_PACKET_INTERARRIVAL_MEAN]), 2);
+		}
+		featureSet[RX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / RxInterarrivalTimes.size();
 	}
-	featureSet[RX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / RxInterarrivalTimes.size();
+	else
+	{
+		featureSet[RX_PACKET_INTERARRIVAL_VARIANCE] = 0;
+	}
 
 	//TX_RX_BYTE_RATIO
-	featureSet[TX_RX_BYTE_RATIO] = TxTotalBytes / RxTotalBytes;
+	if( RxTotalBytes != 0 )
+	{
+		featureSet[TX_RX_BYTE_RATIO] = TxTotalBytes / RxTotalBytes;
+	}
+	else
+	{
+		featureSet[TX_RX_BYTE_RATIO] = 0;
+	}
 }
 
 //The actual classification. Where all the magic happens
