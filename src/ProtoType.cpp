@@ -32,7 +32,11 @@ ANNpointArray normalizedDataPts;
 
 //The feature set in ANN point format
 ANNpoint queryPt = annAllocPt(DIM);
+
 double classification;
+
+//Right now, just equals TCP/UDP port
+int protocol;
 
 
 int main (int argc, char **argv)
@@ -255,7 +259,16 @@ void *TrainingLoop(void *ptr)
 	{
 		sleep(classificationTimeout);
 
-		//TODO: Perform the classification
+		//For the new packet's we've accumulated, recalculate
+		//	Dependency variables
+		for(uint i = 0; i < packetlist.size(); i++)
+		{
+			CalculateDependencyVariables(packetlist[i]);
+		}
+		packetlist.clear();
+
+		CalculateFeatureSet();
+		NormalizeDataPoints();
 	}
 
 	//Shouldn't get here. This is just to get rid of the compiler warning.
@@ -322,7 +335,7 @@ void LoadDataPointsFromFile(string filePath)
 					}
 				}
 				getline(myfile,line);
-				dataPointsWithClass[i]->classification = atoi(line.data());
+				dataPointsWithClass[i]->protocol = atoi(line.data());
 				i++;
 			}
 			nPts = i;
@@ -342,7 +355,7 @@ void WriteDataPointsToFile(int sig)
 		{
 			myfile << featureSet[i] << " ";
 		}
-		myfile << classification;
+		myfile << protocol;
 		myfile << "\n";
 	}
 	else
@@ -488,16 +501,39 @@ void Classify()
 
 	cout << "NN: Index Distance\n";
 
+	//Unsquare the distances and print
 	for (uint i = 0; i < k; i++)
 	{
 		dists[i] = sqrt(dists[i]);
 		cout << i << " " << nnIdx[i] << " " << dists[i] << "\n";
-		delete [] nnIdx;
-		delete [] dists;
-		delete kdTree;
-		annClose();
 	}
 
+	for (uint i = 0; i < k; i++)
+	{
+		//TODO: Make a more sophisticated final guess than mere plurality vote
+		protocolCount[nnIdx[i]]++;
+	}
+
+	int protocolWinner = 0;
+	int highestVotes = 0;
+	//Go through and see which protocol had the most...
+	for (protocolCountTable::iterator it = protocolCount.begin();
+				it != protocolCount.end(); it++ )
+	{
+		if ( it->second > highestVotes)
+		{
+			highestVotes = it->second;
+			protocolWinner = it->first;
+		}
+	}
+
+	classification = protocolWinner;
+	cout << "Classified as: " << classification << "\n";
+
+	delete [] nnIdx;
+	delete [] dists;
+	delete kdTree;
+	annClose();
 }
 
 //Campares two MAC addresses. Returns true if they're identical

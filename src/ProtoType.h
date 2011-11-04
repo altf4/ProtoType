@@ -14,7 +14,7 @@
 #include <time.h>
 #include <string.h>
 #include <netinet/if_ether.h>
-
+#include <tr1/unordered_map>
 
 using namespace std;
 
@@ -34,6 +34,10 @@ using namespace std;
 
 //Number of dimensions
 #define DIM	9
+
+//First == protocol, second == votes
+typedef std::tr1::unordered_map<int, int> protocolCountTable;
+protocolCountTable protocolCount;
 
 //The feature set
 double featureSet[DIM];
@@ -78,7 +82,7 @@ time_t RxLastPacketArrivalTime=0, TxLastPacketArrivalTime=0;
 //###################################################################
 
 //Classification variables
-const uint k = 1;
+const uint k = 3;
 const double eps = 0;
 int maxPts = 1000;
 int nPts = 0;

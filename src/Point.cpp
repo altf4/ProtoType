@@ -13,7 +13,7 @@
 Point::Point()
 {
 	annPoint = annAllocPt(DIM);
-	classification = 0;
+	protocol = 0;
 }
 
 Point::~Point()

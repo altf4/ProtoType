@@ -14,7 +14,9 @@ class Point
 {
 public:
 	ANNpoint annPoint;
-	double classification;
+
+	//Right now, just equals TCP/UDP port
+	int protocol;
 
 	Point();
 	~Point();
