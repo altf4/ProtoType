@@ -37,7 +37,6 @@ using namespace std;
 
 //First == protocol, second == votes
 typedef std::tr1::unordered_map<int, int> protocolCountTable;
-protocolCountTable protocolCount;
 
 //The feature set
 double featureSet[DIM];
@@ -53,7 +52,7 @@ struct packet_t
 {
 	struct ether_addr eth_src_addr;
 	struct ether_addr eth_dest_addr;
-	time_t timestamp;
+	struct timeval timestamp;
 	uint len;
 };
 
@@ -77,8 +76,8 @@ uint RxTotalPackets, TxTotalPackets;
 vector <uint> TxPacketSizes, RxPacketSizes;
 
 //Used to calculate PACKET_INTERARRIVAL_VARIANCE
-vector <time_t> TxInterarrivalTimes, RxInterarrivalTimes;
-time_t RxLastPacketArrivalTime=0, TxLastPacketArrivalTime=0;
+vector <double> TxInterarrivalTimes, RxInterarrivalTimes;
+struct timeval RxLastPacketArrivalTime, TxLastPacketArrivalTime;
 //###################################################################
 
 //Classification variables
@@ -106,5 +105,8 @@ void Classify();
 bool CompareEthAddresses(struct ether_addr *addr1, struct ether_addr *addr2);
 
 string Usage();
+
+int timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y);
+
 
 #endif /* PROTOTYPE_H_ */

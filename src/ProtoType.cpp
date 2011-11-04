@@ -33,6 +33,9 @@ ANNpointArray normalizedDataPts;
 //The feature set in ANN point format
 ANNpoint queryPt = annAllocPt(DIM);
 
+struct timeval TxFirstPacketArrivalTime;
+struct timeval RxFirstPacketArrivalTime;
+
 double classification;
 
 //Right now, just equals TCP/UDP port
@@ -155,6 +158,11 @@ int main (int argc, char **argv)
 	}
 
 
+	//Initialize some vars
+	RxLastPacketArrivalTime.tv_sec = 0;
+	RxLastPacketArrivalTime.tv_usec = 0;
+	TxLastPacketArrivalTime.tv_sec = 0;
+	TxLastPacketArrivalTime.tv_usec = 0;
 
 	//Start listening for packets
 	handle = pcap_open_live(dev.c_str(), BUFSIZ, 1, 1000, errbuf);
@@ -168,7 +176,7 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 {
 	packet_t thisPacket;
 
-	thisPacket.timestamp = header->ts.tv_sec;
+	thisPacket.timestamp = header->ts;
 	thisPacket.len = header->len;
 
 	memcpy( &thisPacket.eth_dest_addr, packet, ETH_ALEN);
@@ -344,28 +352,32 @@ void LoadDataPointsFromFile(string filePath)
 		nPts = i;
 	}
 	else cerr << "Unable to open file.\n";
+
 	myfile.close();
 }
 
 //Called on training mode to save data to file
 void WriteDataPointsToFile(int sig)
 {
-	ofstream myfile (dataFilePath.data(), ios::app);
+	if( isTraining )
+	{
+		ofstream myfile (dataFilePath.data(), ios::app);
 
-	if (myfile.is_open())
-	{
-		for(int i=0; i < DIM; i++)
+		if (myfile.is_open())
 		{
-			myfile << featureSet[i] << " ";
+			for(int i=0; i < DIM; i++)
+			{
+				myfile << featureSet[i] << " ";
+			}
+			myfile << protocol;
+			myfile << "\n";
 		}
-		myfile << protocol;
-		myfile << "\n";
+		else
+		{
+			cerr << "Unable to open file.\n";
+		}
+		myfile.close();
 	}
-	else
-	{
-		cerr << "Unable to open file.\n";
-	}
-	myfile.close();
 	exit(1);
 }
 //Calculate the set of dependency variables for this new packet
@@ -390,13 +402,18 @@ void CalculateDependencyVariables(packet_t packet)
 		RxTotalPackets++;
 
 		//If this is not our first packet...
-		if(RxLastPacketArrivalTime != 0)
+		if(RxLastPacketArrivalTime.tv_sec != 0)
 		{
-			RxInterarrivalTimes.push_back( packet.timestamp - RxLastPacketArrivalTime );
+			struct timeval timeDiff;
+			timeval_subtract(&timeDiff, &packet.timestamp, &RxLastPacketArrivalTime);
+			double timeDiffDouble = timeDiff.tv_sec + ( (double)timeDiff.tv_usec /  1000000.0);
+
+			RxInterarrivalTimes.push_back( timeDiffDouble );
 		}
 		//Our first packet
 		else
 		{
+			RxFirstPacketArrivalTime = packet.timestamp;
 			RxLastPacketArrivalTime = packet.timestamp;
 		}
 		RxPacketSizes.push_back(packet.len);
@@ -408,13 +425,19 @@ void CalculateDependencyVariables(packet_t packet)
 		TxTotalPackets++;
 
 		//If this is not our first packet...
-		if(TxLastPacketArrivalTime != 0)
+		if(TxLastPacketArrivalTime.tv_sec != 0)
 		{
-			TxInterarrivalTimes.push_back( packet.timestamp - TxLastPacketArrivalTime );
+			struct timeval timeDiff;
+			timeval_subtract(&timeDiff, &packet.timestamp, &TxLastPacketArrivalTime);
+			double timeDiffDouble = timeDiff.tv_sec + ( (double)timeDiff.tv_usec /  1000000.0);
+
+			TxInterarrivalTimes.push_back( timeDiffDouble );
+
 		}
 		//Our first packet
 		else
 		{
+			TxFirstPacketArrivalTime = packet.timestamp;
 			TxLastPacketArrivalTime = packet.timestamp;
 		}
 		TxPacketSizes.push_back(packet.len);
@@ -479,8 +502,12 @@ void CalculateFeatureSet()
 	//TX_PACKET_INTERARRIVAL_MEAN
 	if( TxTotalPackets > 1 )
 	{
-		featureSet[TX_PACKET_INTERARRIVAL_MEAN] =
-			( TxInterarrivalTimes.back() - TxInterarrivalTimes.front() ) / TxTotalPackets;
+		struct timeval timeDiff;
+		timeval_subtract(&timeDiff, &TxLastPacketArrivalTime, &TxFirstPacketArrivalTime);
+
+		double timeDiffDouble = timeDiff.tv_sec + ( (double)timeDiff.tv_usec /  1000000.0);
+
+		featureSet[TX_PACKET_INTERARRIVAL_MEAN] =  timeDiffDouble / TxTotalPackets;
 	}
 	else
 	{
@@ -490,8 +517,12 @@ void CalculateFeatureSet()
 	//RX_PACKET_INTERARRIVAL_MEAN
 	if( RxTotalPackets > 1 )
 	{
-		featureSet[RX_PACKET_INTERARRIVAL_MEAN] =
-			( RxInterarrivalTimes.back() - RxInterarrivalTimes.front() ) / RxTotalPackets;
+		struct timeval timeDiff;
+		timeval_subtract(&timeDiff, &RxLastPacketArrivalTime, &RxFirstPacketArrivalTime);
+
+		double timeDiffDouble = timeDiff.tv_sec + ( (double)timeDiff.tv_usec /  1000000.0);
+
+		featureSet[RX_PACKET_INTERARRIVAL_MEAN] =  timeDiffDouble / RxTotalPackets;
 	}
 	else
 	{
@@ -504,11 +535,9 @@ void CalculateFeatureSet()
 	{
 		for(uint i = 0; i < TxInterarrivalTimes.size(); i++)
 		{
-			tempSum += pow( (TxInterarrivalTimes[i] -
-				featureSet[TX_PACKET_INTERARRIVAL_MEAN]), 2);
+			tempSum += pow( TxInterarrivalTimes[i] - featureSet[TX_PACKET_INTERARRIVAL_MEAN], 2);
 		}
-		featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / TxInterarrivalTimes.size();
-	}
+		featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / TxInterarrivalTimes.size();	}
 	else
 	{
 		featureSet[TX_PACKET_INTERARRIVAL_VARIANCE] = 0;
@@ -521,8 +550,7 @@ void CalculateFeatureSet()
 	{
 		for(uint i = 0; i < RxInterarrivalTimes.size(); i++)
 		{
-			tempSum += pow( (RxInterarrivalTimes[i] -
-				featureSet[RX_PACKET_INTERARRIVAL_MEAN]), 2);
+			tempSum += pow( RxInterarrivalTimes[i] - featureSet[RX_PACKET_INTERARRIVAL_MEAN], 2);
 		}
 		featureSet[RX_PACKET_INTERARRIVAL_VARIANCE] = tempSum / RxInterarrivalTimes.size();
 	}
@@ -534,7 +562,7 @@ void CalculateFeatureSet()
 	//TX_RX_BYTE_RATIO
 	if( RxTotalBytes != 0 )
 	{
-		featureSet[TX_RX_BYTE_RATIO] = TxTotalBytes / RxTotalBytes;
+		featureSet[TX_RX_BYTE_RATIO] = (double) TxTotalBytes / (double) RxTotalBytes;
 	}
 	else
 	{
@@ -545,13 +573,11 @@ void CalculateFeatureSet()
 //The actual classification. Where all the magic happens
 void Classify()
 {
-	ANNpoint queryPt;
 
 	ANNidxArray	nnIdx;
 	ANNdistArray dists;
 	ANNkd_tree *kdTree;
 
-	queryPt = annAllocPt(DIM);
 	dataPts = annAllocPts(maxPts, DIM);
 	nnIdx = new ANNidx[k];
 	dists = new ANNdist[k];
@@ -574,13 +600,14 @@ void Classify()
 	for (uint i = 0; i < k; i++)
 	{
 		dists[i] = sqrt(dists[i]);
-		cout << i << " " << nnIdx[i] << " " << dists[i] << "\n";
+		cout << i << " " << nnIdx[i] << " " << dists[i] << " protocol: " <<  dataPointsWithClass[nnIdx[i]]->protocol <<  "\n";
 	}
 
+	protocolCountTable protocolCount;
 	for (uint i = 0; i < k; i++)
 	{
 		//TODO: Make a more sophisticated final guess than mere plurality vote
-		protocolCount[nnIdx[i]]++;
+		protocolCount[dataPointsWithClass[nnIdx[i]]->protocol]++;
 	}
 
 	int protocolWinner = 0;
@@ -616,6 +643,33 @@ bool CompareEthAddresses(struct ether_addr *addr1, struct ether_addr *addr2)
 		}
 	}
 	return true;
+}
+
+/* Subtract the `struct timeval' values X and Y,
+   storing the result in RESULT.
+   Return 1 if the difference is negative, otherwise 0.  */
+
+int timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
+{
+  /* Perform the carry for the later subtraction by updating y. */
+  if (x->tv_usec < y->tv_usec) {
+    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+    y->tv_usec -= 1000000 * nsec;
+    y->tv_sec += nsec;
+  }
+  if (x->tv_usec - y->tv_usec > 1000000) {
+    int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+    y->tv_usec += 1000000 * nsec;
+    y->tv_sec -= nsec;
+  }
+
+  /* Compute the time remaining to wait.
+     tv_usec is certainly positive. */
+  result->tv_sec = x->tv_sec - y->tv_sec;
+  result->tv_usec = x->tv_usec - y->tv_usec;
+
+  /* Return 1 if result is negative. */
+  return x->tv_sec < y->tv_sec;
 }
 
 
