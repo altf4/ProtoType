@@ -47,14 +47,15 @@ double maxFeatureValues[DIM];
 //	-How big the whole packet was
 struct packet_t
 {
-	u_char eth_hdr[ETH_ALEN];
+	struct ether_addr eth_src_addr;
+	struct ether_addr eth_dest_addr;
 	time_t timestamp;
 	uint len;
 };
 
 //Keep track of which end is the "Tx" and which is the "Rx"
-u_int8_t  etherTxAddress[ETH_ALEN];
-u_int8_t  etherRxAddress[ETH_ALEN];
+struct ether_addr etherTxAddress;
+struct ether_addr etherRxAddress;
 
 //An array of the last batch of packets
 //	(Gets cleared out after classification)
@@ -98,7 +99,7 @@ void NormalizeDataPoints();
 void Classify();
 
 
-bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2);
+bool CompareEthAddresses(struct ether_addr *addr1, struct ether_addr *addr2);
 
 string Usage();
 

@@ -17,6 +17,7 @@
 #include <fstream>
 #include <math.h>
 #include <ANN/ANN.h>
+#include <netinet/ether.h>
 
 using namespace std;
 
@@ -89,14 +90,30 @@ int main (int argc, char **argv)
 			}
 			case 's':
 			{
-				//TODO: Accept and validate hw address input
-				//	to etherRxAddress
+				struct ether_addr *temp = ether_aton(optarg);
+				if(temp != NULL)
+				{
+					memcpy(&etherRxAddress, temp, sizeof(ether_addr));
+				}
+				else
+				{
+					cerr << "You entered a bad Rx hw address.\n";
+					cout << Usage();
+				}
 				break;
 			}
 			case 'd':
 			{
-				//TODO: Accept and validate hw address input
-				//	to etherTxAddress
+				struct ether_addr *temp = ether_aton(optarg);
+				if(temp != NULL)
+				{
+					memcpy(&etherTxAddress, temp, sizeof(ether_addr));
+				}
+				else
+				{
+					cerr << "You entered a bad Tx hw address.\n";
+					cout << Usage();
+				}
 				break;
 			}
 			case '?':
@@ -120,10 +137,6 @@ int main (int argc, char **argv)
 			}
 		}
 	}
-
-	//Initialize the ethernet addresses to empty
-	bzero(etherTxAddress, sizeof(etherTxAddress));
-	bzero(etherRxAddress, sizeof(etherRxAddress));
 
 	if(isTraining)
 	{
@@ -152,7 +165,10 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 
 	thisPacket.timestamp = header->ts.tv_sec;
 	thisPacket.len = header->len;
-	memcpy( thisPacket.eth_hdr, packet, ETH_ALEN);
+
+	//Do I need to switch the byte order?
+	memcpy( &thisPacket.eth_dest_addr, packet, ETH_ALEN);
+	memcpy( &thisPacket.eth_src_addr, packet + ETH_ALEN, ETH_ALEN);
 
 	packetlist.push_back(thisPacket);
 }
@@ -341,16 +357,11 @@ void CalculateDependencyVariables(packet_t packet)
 {
 	bool isRx;
 
-	//Pointers into the packet object for different TCP/IP layers
-	struct ether_header *ethernet;
-
-	ethernet = (struct ether_header *) packet.eth_hdr;
-
-	if( CompareEthAddresses( ethernet->ether_shost, etherTxAddress) )
+	if( CompareEthAddresses( &packet.eth_dest_addr , &etherTxAddress) )
 	{
 		isRx = false;
 	}
-	else if( CompareEthAddresses( ethernet->ether_shost, etherRxAddress) )
+	else if( CompareEthAddresses( &packet.eth_src_addr , &etherRxAddress) )
 	{
 		isRx = true;
 	}
@@ -490,11 +501,11 @@ void Classify()
 }
 
 //Campares two MAC addresses. Returns true if they're identical
-bool CompareEthAddresses(u_int8_t *addr1, u_int8_t *addr2)
+bool CompareEthAddresses(struct ether_addr *addr1, struct ether_addr *addr2)
 {
 	for(uint i = 0; i < ETH_ALEN; i++)
 	{
-		if(addr1[i] != addr2[i])
+		if(addr1->ether_addr_octet[i] != addr2->ether_addr_octet[i])
 		{
 			return false;
 		}
