@@ -38,6 +38,7 @@ double classification;
 //Right now, just equals TCP/UDP port
 int protocol;
 
+pthread_mutex_t packetListMutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main (int argc, char **argv)
 {
@@ -174,7 +175,10 @@ void PacketHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	memcpy( &thisPacket.eth_dest_addr, packet, ETH_ALEN);
 	memcpy( &thisPacket.eth_src_addr, packet + ETH_ALEN, ETH_ALEN);
 
+	pthread_mutex_lock( &packetListMutex );
 	packetlist.push_back(thisPacket);
+	pthread_mutex_unlock( &packetListMutex );
+
 }
 
 //Periodically wakes up and reclassifies the data.
@@ -188,11 +192,13 @@ void *ClassificationLoop(void *ptr)
 
 		//For the new packet's we've accumulated, recalculate
 		//	Dependency variables
+		pthread_mutex_lock( &packetListMutex );
 		for(uint i = 0; i < packetlist.size(); i++)
 		{
 			CalculateDependencyVariables(packetlist[i]);
 		}
 		packetlist.clear();
+		pthread_mutex_unlock( &packetListMutex );
 
 		CalculateFeatureSet();
 		NormalizeDataPoints();
@@ -261,11 +267,13 @@ void *TrainingLoop(void *ptr)
 
 		//For the new packet's we've accumulated, recalculate
 		//	Dependency variables
+		pthread_mutex_lock( &packetListMutex );
 		for(uint i = 0; i < packetlist.size(); i++)
 		{
 			CalculateDependencyVariables(packetlist[i]);
 		}
 		packetlist.clear();
+		pthread_mutex_unlock( &packetListMutex );
 
 		CalculateFeatureSet();
 		NormalizeDataPoints();
@@ -280,68 +288,68 @@ void *TrainingLoop(void *ptr)
 void LoadDataPointsFromFile(string filePath)
 {
 	ifstream myfile (dataFilePath.data());
-		string line;
-		int i = 0;
-		//Count the number of data points for allocation
-		if (myfile.is_open())
+	string line;
+	int i = 0;
+	//Count the number of data points for allocation
+	if (myfile.is_open())
 		{
-			while (!myfile.eof())
+		while (!myfile.eof())
+		{
+			if(myfile.peek() == EOF)
 			{
-				if(myfile.peek() == EOF)
-				{
-					break;
-				}
-				getline(myfile,line);
-				i++;
+				break;
 			}
+			getline(myfile,line);
+			i++;
 		}
-		else
+	}
+	else
+	{
+		cerr << "Unable to open file.\n";
+	}
+	myfile.close();
+	maxPts = i;
+
+	//Open the file again, allocate the number of points and assign
+	myfile.open(dataFilePath.data(), ifstream::in);
+	dataPts = annAllocPts(maxPts, DIM);
+	normalizedDataPts = annAllocPts(maxPts, DIM);
+
+	if (myfile.is_open())
+	{
+		i = 0;
+
+		while (!myfile.eof() && (i < maxPts))
 		{
-			cerr << "Unable to open file.\n";
-		}
-		myfile.close();
-		maxPts = i;
-
-		//Open the file again, allocate the number of points and assign
-		myfile.open(dataFilePath.data(), ifstream::in);
-		dataPts = annAllocPts(maxPts, DIM);
-		normalizedDataPts = annAllocPts(maxPts, DIM);
-
-		if (myfile.is_open())
-		{
-			i = 0;
-
-			while (!myfile.eof() && (i < maxPts))
+			if(myfile.peek() == EOF)
 			{
-				if(myfile.peek() == EOF)
-				{
-					break;
-				}
-
-				dataPointsWithClass.push_back(new Point());
-
-				for(int j = 0;j < DIM;j++)
-				{
-					getline(myfile,line,' ');
-					double temp = strtod(line.data(), NULL);
-
-					dataPointsWithClass[i]->annPoint[j] = temp;
-					dataPts[i][j] = temp;
-
-					//Set the max values of each feature. (Used later in normalization)
-					if(temp > maxFeatureValues[j])
-					{
-						maxFeatureValues[j] = temp;
-					}
-				}
-				getline(myfile,line);
-				dataPointsWithClass[i]->protocol = atoi(line.data());
-				i++;
+				break;
 			}
-			nPts = i;
+
+			dataPointsWithClass.push_back(new Point());
+
+			for(int j = 0;j < DIM;j++)
+			{
+				getline(myfile,line,' ');
+				double temp = strtod(line.data(), NULL);
+
+				dataPointsWithClass[i]->annPoint[j] = temp;
+				dataPts[i][j] = temp;
+
+				//Set the max values of each feature. (Used later in normalization)
+				if(temp > maxFeatureValues[j])
+				{
+					maxFeatureValues[j] = temp;
+				}
+			}
+			getline(myfile,line);
+			dataPointsWithClass[i]->protocol = atoi(line.data());
+			i++;
 		}
-		else cerr << "Unable to open file.\n";
-		myfile.close();
+		nPts = i;
+	}
+	else cerr << "Unable to open file.\n";
+	myfile.close();
 }
 
 //Called on training mode to save data to file
